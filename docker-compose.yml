@@ -1,0 +1,82 @@
+services:
+  backend:
+    build: .
+    container_name: my-backend
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      MONGO_URI: mongodb://rootuser:rootpass@mongodb:27017/mydatabase?authSource=admin
+      PORT: 3000
+    depends_on:
+      - redis
+    networks:
+      - app-network
+    ports:
+      - "3000:3000"
+    command: ["node", "build/index.js"]
+
+  worker:
+    build: .
+    container_name: my-worker
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MONGO_URI=mongodb://rootuser:rootpass@mongodb:27017/mydatabase?authSource=admin
+    depends_on:
+      - redis
+      - mongodb
+      - backend
+    networks:
+      - app-network
+    command: ["node", "build/worker.js"]
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - app-network
+
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: rootuser
+      MONGO_INITDB_ROOT_PASSWORD: rootpass
+      MONGO_INITDB_DATABASE: mydatabase
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - app-network
+
+  mongo-admin:
+    image: mongo-express:latest
+    container_name: mongo-admin
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: rootuser
+      ME_CONFIG_MONGODB_ADMINPASSWORD: rootpass
+      ME_CONFIG_MONGODB_SERVER: mongodb
+      ME_CONFIG_MONGODB_URL: mongodb://rootuser:rootpass@mongodb:27017/mydatabase?authSource=admin
+      ME_CONFIG_MONGODB_PORT: 27017
+    ports:
+      - "8081:8081"
+    depends_on:
+      - mongodb
+    networks:
+      - app-network
+
+volumes:
+  redis-data:
+    driver: local
+  mongo-data:
+    driver: local
+
+networks:
+  app-network:
+    driver: bridge
